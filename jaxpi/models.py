@@ -101,6 +101,30 @@ def _create_train_state(config):
     return jax_utils.replicate(state)
 
 
+def _create_inv_train_state(config):
+    # Initialize network
+    arch = _create_arch(config.arch)
+    x = jnp.ones(config.input_dim)
+    params = arch.init(random.PRNGKey(config.seed), x)
+    params['params'].update(config.inverse.params)
+
+    # Initialize optax optimizer
+    tx = _create_optimizer(config.optim)
+
+    # Convert config dict to dict
+    init_weights = dict(config.weighting.init_weights)
+
+    state = TrainState.create(
+        apply_fn=arch.apply,
+        params=params,
+        tx=tx,
+        weights=init_weights,
+        momentum=config.weighting.momentum,
+    )
+
+    return jax_utils.replicate(state)
+
+
 class PINN:
     def __init__(self, config):
         self.config = config
@@ -187,3 +211,14 @@ class ForwardIVP(PINN):
 class ForwardBVP(PINN):
     def __init__(self, config):
         super().__init__(config)
+        
+        
+class InverseIVP(PINN):
+    def __init__(self, config):
+        self.config = config
+        self.state = _create_inv_train_state(config)
+        
+        if config.weighting.use_causal:
+            self.tol = config.weighting.causal_tol
+            self.num_chunks = config.weighting.num_chunks
+            self.M = jnp.triu(jnp.ones((self.num_chunks, self.num_chunks)), k=1).T
