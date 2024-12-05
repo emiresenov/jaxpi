@@ -167,8 +167,7 @@ class PINN:
             # Compute the mean of grad norms over all losses
             mean_grad_norm = jnp.mean(jnp.stack(tree_leaves(grad_norm_dict)))
             # Grad Norm Weighting
-            epsilon = 1e-8
-            w = tree_map(lambda x: (mean_grad_norm / (x + epsilon)), grad_norm_dict)
+            w = tree_map(lambda x: (mean_grad_norm / x), grad_norm_dict)
 
         elif self.config.weighting.scheme == "ntk":
             # Compute the diagonal of the NTK of each loss
