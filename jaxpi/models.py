@@ -67,7 +67,19 @@ def _create_optimizer(config):
         tx = optax.adam(
             learning_rate=lr, b1=config.beta1, b2=config.beta2, eps=config.eps
         )
-
+    elif config.optimizer == "AdamW":
+        lr = optax.exponential_decay(
+            init_value=config.learning_rate,
+            transition_steps=config.decay_steps,
+            decay_rate=config.decay_rate,
+        )
+        tx = optax.adamw(
+            learning_rate=lr,
+            b1=config.beta1, 
+            b2=config.beta2, 
+            eps=config.eps,
+            weight_decay=1e-2 # TODO: read from config
+        )
     else:
         raise NotImplementedError(f"Optimizer {config.optimizer} not supported yet!")
 
@@ -78,35 +90,13 @@ def _create_optimizer(config):
     return tx
 
 
-def _create_train_state(config):
+def _create_train_state(config, inverse_mode=False):
     # Initialize network
     arch = _create_arch(config.arch)
     x = jnp.ones(config.input_dim)
     params = arch.init(random.PRNGKey(config.seed), x)
-
-    # Initialize optax optimizer
-    tx = _create_optimizer(config.optim)
-
-    # Convert config dict to dict
-    init_weights = dict(config.weighting.init_weights)
-
-    state = TrainState.create(
-        apply_fn=arch.apply,
-        params=params,
-        tx=tx,
-        weights=init_weights,
-        momentum=config.weighting.momentum,
-    )
-
-    return jax_utils.replicate(state)
-
-
-def _create_inv_train_state(config):
-    # Initialize network
-    arch = _create_arch(config.arch)
-    x = jnp.ones(config.input_dim)
-    params = arch.init(random.PRNGKey(config.seed), x)
-    params['params'].update(config.inverse.params)
+    if inverse_mode:
+        params['params'].update(config.inverse.params)
 
     # Initialize optax optimizer
     tx = _create_optimizer(config.optim)
@@ -217,7 +207,7 @@ class ForwardBVP(PINN):
 class InverseIVP(PINN):
     def __init__(self, config):
         self.config = config
-        self.state = _create_inv_train_state(config)
+        self.state = _create_train_state(config, inverse_mode=True)
         
         if config.weighting.use_causal:
             self.tol = config.weighting.causal_tol
