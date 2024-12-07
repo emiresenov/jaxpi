@@ -67,19 +67,6 @@ def _create_optimizer(config):
         tx = optax.adam(
             learning_rate=lr, b1=config.beta1, b2=config.beta2, eps=config.eps
         )
-    elif config.optimizer == "AdamW":
-        lr = optax.exponential_decay(
-            init_value=config.learning_rate,
-            transition_steps=config.decay_steps,
-            decay_rate=config.decay_rate,
-        )
-        tx = optax.adamw(
-            learning_rate=lr,
-            b1=config.beta1, 
-            b2=config.beta2, 
-            eps=config.eps,
-            weight_decay=1e-2 # TODO: read from config
-        )
     else:
         raise NotImplementedError(f"Optimizer {config.optimizer} not supported yet!")
 
