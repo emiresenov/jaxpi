@@ -5,7 +5,7 @@ from flax.training import train_state
 from flax import jax_utils
 
 import jax.numpy as jnp
-from jax import lax, jit, grad, pmap, random, tree_map, jacfwd, jacrev
+from jax import lax, jit, grad, pmap, random, tree_map, jacrev, value_and_grad
 from jax.tree_util import tree_map, tree_reduce, tree_leaves
 
 import optax
@@ -51,6 +51,9 @@ def _create_arch(config):
     elif config.arch_name == "DeepONet":
         arch = archs.DeepONet(**config)
 
+    elif config.arch_name == "TwoNetworkModel":
+        arch = archs.TwoNetworkModel(config)
+
     else:
         raise NotImplementedError(f"Arch {config.arch_name} not supported yet!")
 
@@ -67,7 +70,8 @@ def _create_optimizer(config):
         tx = optax.adam(
             learning_rate=lr, b1=config.beta1, b2=config.beta2, eps=config.eps
         )
-
+    elif config.optimizer == "LBFGS":
+        tx = optax.lbfgs(learning_rate=config.learning_rate)
     else:
         raise NotImplementedError(f"Optimizer {config.optimizer} not supported yet!")
 
@@ -78,11 +82,13 @@ def _create_optimizer(config):
     return tx
 
 
-def _create_train_state(config):
+def _create_train_state(config, inverse_mode=False):
     # Initialize network
     arch = _create_arch(config.arch)
     x = jnp.ones(config.input_dim)
     params = arch.init(random.PRNGKey(config.seed), x)
+    if inverse_mode:
+        params['params'].update(config.inverse.params)
 
     # Initialize optax optimizer
     tx = _create_optimizer(config.optim)
@@ -143,7 +149,8 @@ class PINN:
             # Compute the mean of grad norms over all losses
             mean_grad_norm = jnp.mean(jnp.stack(tree_leaves(grad_norm_dict)))
             # Grad Norm Weighting
-            w = tree_map(lambda x: (mean_grad_norm / x), grad_norm_dict)
+            epsilon = 1e-8
+            w = tree_map(lambda x: (mean_grad_norm / (x + epsilon)), grad_norm_dict)
 
         elif self.config.weighting.scheme == "ntk":
             # Compute the diagonal of the NTK of each loss
@@ -170,7 +177,12 @@ class PINN:
     def step(self, state, batch, *args):
         grads = grad(self.loss)(state.params, state.weights, batch, *args)
         grads = lax.pmean(grads, "batch")
-        state = state.apply_gradients(grads=grads)
+        if self.config.optim.optimizer == "LBFGS":
+            value_fn = lambda params: self.loss(params, state.weights, batch, *args)
+            value, grads = value_and_grad(value_fn)(state.params)
+            state = state.apply_gradients(grads=grads, grad=grads, value=value, value_fn=value_fn)
+        else:
+            state = state.apply_gradients(grads=grads)
         return state
 
 
@@ -187,3 +199,9 @@ class ForwardIVP(PINN):
 class ForwardBVP(PINN):
     def __init__(self, config):
         super().__init__(config)
+        
+    
+class InverseIVP(PINN):
+    def __init__(self, config):
+        self.config = config
+        self.state = _create_train_state(config, inverse_mode=True)

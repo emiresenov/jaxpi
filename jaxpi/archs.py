@@ -155,6 +155,23 @@ class Mlp(nn.Module):
         return x
 
 
+class TwoNetworkModel(nn.Module):
+    config: dict
+
+    def setup(self):
+        self.net1 = Mlp(**self.config)
+        self.net2 = Mlp(**self.config)
+
+    def __call__(self, x):
+        x1 = jnp.stack([x[0]])
+        x2 = jnp.stack([x[1]])
+        y2 = jnp.exp(self.net2(x2))
+        y2 = jnp.clip(y2, a_min=1e-3, a_max=1000)
+        x1 = jnp.concatenate([x1, y2], axis=-1)
+        y1 = self.net1(x1)
+        return y1, y2
+
+    
 class ModifiedMlp(nn.Module):
     arch_name: Optional[str] = "ModifiedMlp"
     num_layers: int = 4
