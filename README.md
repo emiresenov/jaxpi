@@ -1,12 +1,12 @@
-## Briefly on changes for inverse RC fork 
+## Briefly on changes for inverse-DR fork 
 
-Changes are minimal (40 lines) and do not change the core functionality of the library, see them in [this commit](https://github.com/emiresenov/jaxpi/commit/1f91bea646e6b9624ddaaf6a11553197974bd74e). These include
+Changes are minimal (40 lines) and do not change the core functionality of the library, see them in [this commit](https://github.com/emiresenov/jaxpi/commit/1f91bea646e6b9624ddaaf6a11553197974bd74e). These include:
 - An inverse PINN class where the user enters their inverse parameters in the config of their example.
 - Added tiny grad norm clipping to fix a div by zero issue that we encountered for certain examples. 
 - Support for LBFGS optimizer (https://github.com/google/flax/pull/4471), which was not used in the results but only for experimentation.
 - A subnet architecture for temperature-dependent examples.
 
-⬇️⬇️⬇️ **Original doc continues down below** ⬇️⬇️⬇️
+⬇️⬇️⬇️ **original doc continues down below** ⬇️⬇️⬇️
 
 # JAX-PI
 
