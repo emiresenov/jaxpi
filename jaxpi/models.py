@@ -51,8 +51,11 @@ def _create_arch(config):
     elif config.arch_name == "DeepONet":
         arch = archs.DeepONet(**config)
 
-    elif config.arch_name == "TwoNetworkModel":
-        arch = archs.TwoNetworkModel(config)
+    elif config.arch_name == "DRTemperatureModel":
+        arch = archs.DRTemperatureModel(config)
+
+    elif config.arch_name == "DFRConcentrationModel":
+        arch = archs.DFRConcentrationModel(config)
 
     else:
         raise NotImplementedError(f"Arch {config.arch_name} not supported yet!")
